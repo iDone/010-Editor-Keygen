@@ -282,11 +282,19 @@ section '.data' data readable writable
     szNameKey           db      'Name', 0
     szPassword          db      'Password', 0
     
-    ;   Message to display when the software is Unregistered
+    ;   Message to display when 010 Editor is Unregistered
 
     szUnregistered      db      '010 Editor is currently UNREGISTERED !'
                         db      10
                         db      'Please Register it !', 0
+
+    ;   Message to display when 010 Editor is not installed
+
+    szNotInstalled      db      "You haven't yet installed 010 Editor !"
+                        db      10, 10
+                        db      'Download 010 Editor : http://www.sweetscape.com/download/010editor/', 0
+
+    szMessages          dd      szNotInstalled, szUnregistered
 
     ;   Used for Calculating bytes at offset 4, 5, 6, 7 in the license key
     
@@ -939,13 +947,17 @@ get_info:
 ;   Is 010 Editor Unregistered ?
 ;   -----------------------------
 @@:
+    pop eax
+    pushf
     jnc @f
     invoke fnHeapFree, [hHeap], 0, ebx
     invoke fnHeapFree, [hHeap], 0, esi
     invoke fnRegCloseKey, edi
 @@:
-    pop eax
-    invoke fnMessageBox, ebp, szUnregistered, szMsgBoxTitle, MB_ICONWARNING
+    popf
+    sbb eax, eax
+    neg eax
+    invoke fnMessageBox, ebp, [szMessages+eax*4], szMsgBoxTitle, MB_ICONWARNING
     jmp get_info.ret
 
 
