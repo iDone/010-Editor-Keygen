@@ -13,6 +13,4 @@ Here are the steps for Assembling
 1. Download [Flat Assembler](http://flatassembler.net/download.php)
 2. Assemble using the following command
 
-  `
-  C:\> fasm [filename].asm
-  `
+   `fasm [filename].asm`
