@@ -16,4 +16,4 @@ Here are the steps for Assembling
 
 ### License
 
-[MIT](/license.md)
+[MIT](/LICENSE)
