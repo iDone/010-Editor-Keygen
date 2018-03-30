@@ -1119,8 +1119,8 @@ section '.res' data readable resource
     
     versioninfo ver_info,VOS__WINDOWS32,VFT_APP,VFT2_UNKNOWN,\
         LANG_ENGLISH+SUBLANG_DEFAULT,0,\
-        'FileVersion', '2.3.0',\
-        'ProductVersion', '2.3.0',\
+        'FileVersion', '1.3.0',\
+        'ProductVersion', '1.3.0',\
         'FileDescription', 'KeyGen for 010 Editor',\
         'ProductName', '010 Editor KeyGen',\
         'CompanyName', 'x0r19x91'
