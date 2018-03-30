@@ -491,15 +491,12 @@ get_days:
     lea ebx, [esp]
     push eax
     push eax
-    invoke fnNtQuerySystemTime, esp
-    push esp
-    xchg ebx, [esp]
-    push ebx
-    call [fnFileTimeToLocalFileTime]
-    pop eax
-    pop eax
+    invoke fnNtQuerySystemTime, ebx
+    invoke fnFileTimeToLocalFileTime, ebx, esp
     pop eax
     pop edx
+    pop ebx
+    pop ebx
     shrd eax, edx, 14
     shr edx, 14
     mov ebx, 0x324a9a7
