@@ -85,7 +85,7 @@
 
 ;   Define the Entry Point and force FASM to generate 32 bit code
 
-    entry x0r19x91
+    entry start
     use32
 
 
@@ -180,11 +180,11 @@ section '.data' data readable writable
     fnGetDlgItem        dd      ?
     fnSetClipboardData  dd      ?
     fnCloseClipboard    dd      ?
-    fnDialogBoxParam    dd      ?
     fnPostQuitMessage   dd      ?
     fnGetDlgItemInt     dd      ?
     fnMessageBox        dd      ?
     fnNtQuerySystemTime dd      ?
+    fnDialogBoxIParam   dd      ?
 
     szSendMessageA      db      'SendMessageA', 0
     szOpenClipboard     db      'OpenClipboard', 0
@@ -192,7 +192,7 @@ section '.data' data readable writable
     szGetDlgItem        db      'GetDlgItem', 0
     szSetClipboardData  db      'SetClipboardData', 0
     szCloseClipboard    db      'CloseClipboard', 0
-    szDialogBoxParamA   db      'DialogBoxParamA', 0
+    szDialogBoxIParam   db      'DialogBoxIndirectParamA', 0
     szPostQuitMessage   db      'PostQuitMessage', 0
     szGetDlgItemInt     db      'GetDlgItemInt', 0
     szMessageBoxA       db      'MessageBoxA', 0
@@ -240,7 +240,7 @@ section '.data' data readable writable
                         dd      szGetDlgItem, fnGetDlgItem
                         dd      szSetClipboardData, fnSetClipboardData
                         dd      szCloseClipboard, fnCloseClipboard
-                        dd      szDialogBoxParamA, fnDialogBoxParam
+                        dd      szDialogBoxIParam, fnDialogBoxIParam
                         dd      szPostQuitMessage, fnPostQuitMessage
                         dd      szGetDlgItemInt, fnGetDlgItemInt
                         dd      szMessageBoxA, fnMessageBox
@@ -318,6 +318,132 @@ section '.data' data readable writable
                         dd      1559389967, 567085571, 1560216161, 867042846, 1001796703, 1568754293, 628841972
                         dd      173812827, 379868455, 384973125
 
+    ;   Template for dialog box
+
+    tmpDialog           dd      DS_SETFONT or DS_FIXEDSYS or DS_MODALFRAME or WS_CAPTION or WS_SYSMENU
+                        dd      WS_EX_CLIENTEDGE or WS_EX_APPWINDOW
+                        dw      13
+                        dw      100, 100, 260, 114
+                        
+                        align 2
+                        dw      0
+                        dw      0
+                        du      '010 Editor KeyGen', 0
+                        dw      8
+                        du      'MS Shell Dlg 2', 0
+
+                        align 4
+                        dd      ES_LEFT+ES_AUTOHSCROLL+WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP
+                        dd      0
+                        dw      34,12,65,12
+                        dw      IDC_TEXT_NAME
+                        dw      -1, 0x81
+                        dw      0, 0
+
+                        align 4
+                        dd      WS_VISIBLE+WS_TABSTOP
+                        dd      0
+                        dw      153,23,90,14
+                        dw      IDC_DATE_DAYS
+                        du      'SysDateTimePick32', 0
+                        dw      0, 0
+
+                        align 4
+                        dd      ES_LEFT+ES_AUTOHSCROLL+WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP+ES_NUMBER
+                        dd      0
+                        dw      34,32,54,14
+                        dw      IDC_TEXT_USERS
+                        dw      -1, 0x81
+                        dw      0, 0
+
+                        align 4
+                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      0
+                        dw      72,93,50,14
+                        dw      IDC_BTN_COPY
+                        du      -1, 0x80
+                        du      'Copy', 0
+                        dw      0
+
+                        align 4
+                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      0
+                        dw      203,93,50,14
+                        dw      IDC_BTN_INFO
+                        du      -1, 0x80
+                        du      'Info', 0
+                        dw      0
+
+                        align 4
+                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      0
+                        dw      7,93,59,14
+                        dw      IDC_BTN_CLRREG
+                        du      -1, 0x80
+                        du      'Clear Registry', 0
+                        dw      0
+
+                        align 4
+                        dd      SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
+                        dd      0
+                        dw      7,15,19,8
+                        dw      -1
+                        du      -1, 0x82
+                        du      'Name', 0
+                        dw      0
+
+                        align 4
+                        dd      SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
+                        dd      0
+                        dw      7,35,19,8
+                        dw      -1
+                        du      -1, 0x82
+                        du      'Users', 0
+                        dw      0
+
+                        align 4
+                        dd      UDS_SETBUDDYINT+UDS_ARROWKEYS+WS_CHILD+WS_VISIBLE
+                        dd      0
+                        dw      88,32,12,14
+                        dw      IDC_SPIN_USERS
+                        du      'msctls_updown32', 0
+                        dw      0, 0
+
+                        align 4
+                        dd      BS_GROUPBOX+WS_CHILD+WS_VISIBLE
+                        dd      0
+                        dw      7,50,245,36
+                        dw      -1
+                        du      -1, 0x80
+                        du      'License Info', 0
+                        dw      0
+
+                        align 4
+                        dd      SS_CENTER+WS_CHILD+WS_VISIBLE+WS_GROUP
+                        dd      0x00020000
+                        dw      70,64,120,12
+                        dw      IDC_LABEL_SERIAL
+                        du      -1, 0x82
+                        dw      0, 0
+
+                        align 4
+                        dd      BS_GROUPBOX+WS_CHILD+WS_VISIBLE
+                        dd      0
+                        dw      109,11,143,34
+                        dw      -1
+                        du      -1, 0x80
+                        du      'Validity', 0
+                        dw      0
+
+                        align 4
+                        dd      SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
+                        dd      0
+                        dw      117,26,29,8
+                        dw      -1
+                        du      -1, 0x82
+                        du      'End Date', 0
+                        dw      0
+
 
 
 
@@ -331,14 +457,14 @@ section '.text' code readable executable
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
-;   |                   Function    :   x0r19x91_init                       |
+;   |                   Function    :   init                                |
 ;   |                   Arguments   :   -                                   |
 ;   |                   Returns     :   %esi, %edi                          |
 ;   |                       %esi -> Address of GetProcAddress               |
 ;   |                       %edi -> Address of LoadLibrary                  |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-x0r19x91_init:
+init:
     mov eax, [fs:0x30]      ;   PEB
     mov eax, [eax+12]       ;   PEB_LDR_DATA
     mov ebx, [eax+12]       ;   InLoadOrderModuleList
@@ -1001,8 +1127,8 @@ on_command:
 ;   |                              Entry Point                              |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-x0r19x91:
-    call x0r19x91_init
+start:
+    call init
     ;   edi - LoadLibrary, esi - GetProcAddress
     or ebx, -1
     push ebx
@@ -1043,7 +1169,7 @@ x0r19x91:
     pop eax
     mov eax, [fs:0x30]
     mov eax, [eax+8]
-    invoke fnDialogBoxParam, eax, IDD_MAIN_DIALOG, NULL, dialog_callback, NULL
+    invoke fnDialogBoxIParam, eax, tmpDialog, NULL, dialog_callback, NULL
     invoke fnExitProcess, 0
 
 
@@ -1055,63 +1181,10 @@ x0r19x91:
 
 section '.res' data readable resource
 
-    directory RT_DIALOG, dialogs, RT_VERSION, version_info,\
-        RT_MANIFEST, manifest_info
+    directory RT_VERSION, version_info, RT_MANIFEST, manifest_info
     
-    resource dialogs, IDD_MAIN_DIALOG, LANGUAGE_ID, main_dialog
     resource version_info, 1, LANGUAGE_ID, ver_info
     resource manifest_info, 1, LANGUAGE_ID, m_info
-    
-    ;   -----------------
-    ;   Dialog Box Layout
-    ;   -----------------
-    
-    dialog main_dialog, '010 Editor Keygen', 100, 100, 260, 114,\
-        DS_FIXEDSYS+DS_MODALFRAME+WS_CAPTION+\
-        WS_MINIMIZEBOX+WS_SYSMENU,WS_EX_CLIENTEDGE+\
-        WS_EX_APPWINDOW,,'MS Shell Dlg 2',8
-        
-        dialogitem 'EDIT','',IDC_TEXT_NAME,34,12,65,14,\
-            ES_LEFT+ES_AUTOHSCROLL+\
-            WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP
-
-        dialogitem 'SysDateTimePick32', '', IDC_DATE_DAYS,\
-            153,23,90,14, WS_VISIBLE+WS_TABSTOP
-
-        dialogitem 'EDIT','',IDC_TEXT_USERS,34,32,54,14,\
-            ES_LEFT+ES_AUTOHSCROLL+\
-            WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP+ES_NUMBER
-
-        dialogitem 'BUTTON','Copy',IDC_BTN_COPY,72,93,50,14,\
-            BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
-
-        dialogitem 'BUTTON','Info',IDC_BTN_INFO,203,93,50,14,\
-            BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
-
-        dialogitem 'BUTTON','Clear Registry',IDC_BTN_CLRREG,\
-            7,93,59,14,BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
-
-        dialogitem 'STATIC','Name',-1,7,15,19,8,\
-            SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
-
-        dialogitem 'STATIC','Users',-1,7,35,19,8,\
-            SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
-
-        dialogitem 'msctls_updown32','',IDC_SPIN_USERS,88,32,12,14,\
-            UDS_SETBUDDYINT+UDS_ARROWKEYS+WS_CHILD+WS_VISIBLE
-
-        dialogitem 'BUTTON','License Info',-1,\
-            7,50,245,36,BS_GROUPBOX+WS_CHILD+WS_VISIBLE
-
-        dialogitem 'STATIC','',IDC_LABEL_SERIAL,70,64,120,12,\
-            SS_CENTER+WS_CHILD+WS_VISIBLE+WS_GROUP,0x00020000
-
-        dialogitem 'BUTTON','Validity',-1,\
-            109,11,143,34,BS_GROUPBOX+WS_CHILD+WS_VISIBLE
-
-        dialogitem 'STATIC','End Date',-1,\
-            117,26,19+10,8,SS_LEFT+WS_CHILD+WS_VISIBLE+WS_GROUP
-    enddialog
     
     ;   ------------
     ;   Version Info
@@ -1119,8 +1192,8 @@ section '.res' data readable resource
     
     versioninfo ver_info,VOS__WINDOWS32,VFT_APP,VFT2_UNKNOWN,\
         LANG_ENGLISH+SUBLANG_DEFAULT,0,\
-        'FileVersion', '1.3.0',\
-        'ProductVersion', '1.3.0',\
+        'FileVersion', '2.3.0',\
+        'ProductVersion', '2.3.0',\
         'FileDescription', 'KeyGen for 010 Editor',\
         'ProductName', '010 Editor KeyGen',\
         'CompanyName', 'x0r19x91'
