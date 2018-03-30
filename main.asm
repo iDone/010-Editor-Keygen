@@ -149,28 +149,14 @@ section '.data' data readable writable
     sysEndDate      SYSTEMTIME  3000, 12, 3, 31, 23, 59, 59, 0
     sysFileTime         dq      ?
 
-    szKernel32          db      'K', 0
-                        db      'E', 0
-                        db      'R', 0
-                        db      'N', 0
-                        db      'E', 0
-                        db      'L', 0
-                        db      '3', 0
-                        db      '2', 0
-                        db      '.', 0
-                        db      'D', 0
-                        db      'L', 0
-                        db      'L', 0
-                        db      0x0, 0
+    szKernel32          du      'KERNEL32.DLL', 0
+    szNtdll             du      'ntdll.dll', 0
 
     szUser32            db      'USER32.DLL', 0
     szMsvcrt            db      'MSVCRT.DLL', 0
     szAdvapi32          db      'ADVAPI32.DLL', 0
     szKernel32A         db      'KERNEL32.DLL', 0
 
-    fnTime64            dd      ?
-    fnLocalTime64       dd      ?
-    fnMkTime64          dd      ?
     fnExitProcess       dd      ?
     fnGlobalAlloc       dd      ?
     fnGlobalLock        dd      ?
@@ -181,8 +167,9 @@ section '.data' data readable writable
     fnFormatMessage     dd      ?
     fnLocalFree         dd      ?
     fnGetLocalTime      dd      ?
-    fnSystemTimeToFileTime          dd      ?
-    fnFileTimeToSystemTime          dd      ?
+    fnSystemTimeToFileTime      dd      ?
+    fnFileTimeToSystemTime      dd      ?
+    fnFileTimeToLocalFileTime   dd      ?
     fnRegOpenKeyEx      dd      ?
     fnRegDeleteTree     dd      ?
     fnRegCloseKey       dd      ?
@@ -197,6 +184,7 @@ section '.data' data readable writable
     fnPostQuitMessage   dd      ?
     fnGetDlgItemInt     dd      ?
     fnMessageBox        dd      ?
+    fnNtQuerySystemTime dd      ?
 
     szSendMessageA      db      'SendMessageA', 0
     szOpenClipboard     db      'OpenClipboard', 0
@@ -208,9 +196,6 @@ section '.data' data readable writable
     szPostQuitMessage   db      'PostQuitMessage', 0
     szGetDlgItemInt     db      'GetDlgItemInt', 0
     szMessageBoxA       db      'MessageBoxA', 0
-    szTime64            db      '_time64', 0
-    szLocalTime64       db      '_localtime64', 0
-    szMkTime64          db      '_mktime64', 0    
     szExitProcess       db      'ExitProcess', 0
     szGlobalAlloc       db      'GlobalAlloc', 0
     szGlobalLock        db      'GlobalLock', 0
@@ -227,17 +212,14 @@ section '.data' data readable writable
     szRegDeleteTree     db      'RegDeleteTreeA', 0
     szRegCloseKey       db      'RegCloseKey', 0
     szRegQueryValueExA  db      'RegQueryValueExA', 0
+    szFT2LFT            db      'FileTimeToLocalFileTime', 0
 
-    tabMsvcrt           dd      3
-                        dd      szTime64, fnTime64
-                        dd      szLocalTime64, fnLocalTime64
-                        dd      szMkTime64, fnMkTime64
     tabAdvapi32         dd      4
                         dd      szRegOpenKeyEx, fnRegOpenKeyEx
                         dd      szRegDeleteTree, fnRegDeleteTree
                         dd      szRegCloseKey, fnRegCloseKey
                         dd      szRegQueryValueExA, fnRegQueryValueEx
-    tabKernel32         dd      12
+    tabKernel32         dd      13
                         dd      szExitProcess, fnExitProcess
                         dd      szGlobalAlloc, fnGlobalAlloc
                         dd      szGlobalLock, fnGlobalLock
@@ -250,6 +232,7 @@ section '.data' data readable writable
                         dd      szGetLocalTime, fnGetLocalTime
                         dd      szSysTime2FileTime, fnSystemTimeToFileTime
                         dd      szFileTime2SysTime, fnFileTimeToSystemTime
+                        dd      szFT2LFT, fnFileTimeToLocalFileTime
     tabUser32           dd      10
                         dd      szSendMessageA, fnSendMessage
                         dd      szOpenClipboard, fnOpenClipboard
@@ -262,11 +245,10 @@ section '.data' data readable writable
                         dd      szGetDlgItemInt, fnGetDlgItemInt
                         dd      szMessageBoxA, fnMessageBox
 
-    pTables             dd      4
+    pTables             dd      3
                         dd      szKernel32A, tabKernel32
                         dd      szAdvapi32, tabAdvapi32
                         dd      szUser32, tabUser32
-                        dd      szMsvcrt, tabMsvcrt
 
 
     ;   Path to Registry Key for querying the existence of a registered user
@@ -349,14 +331,14 @@ section '.text' code readable executable
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
-;   |                   Function    :   find_routines                       |
+;   |                   Function    :   x0r19x91_init                       |
 ;   |                   Arguments   :   -                                   |
 ;   |                   Returns     :   %esi, %edi                          |
 ;   |                       %esi -> Address of GetProcAddress               |
 ;   |                       %edi -> Address of LoadLibrary                  |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-find_routines:
+x0r19x91_init:
     mov eax, [fs:0x30]      ;   PEB
     mov eax, [eax+12]       ;   PEB_LDR_DATA
     mov ebx, [eax+12]       ;   InLoadOrderModuleList
@@ -371,7 +353,7 @@ find_routines:
     mov edi, [ebx+48]
     rep cmpsw
     or ecx, ecx
-    jnz .next_module
+    jnz .is_ntdll
 
     ;   found kernel32
 
@@ -379,6 +361,20 @@ find_routines:
     lea edi, [eax+0x24bf0]
     lea esi, [eax+0x178b0]
     ret
+
+.is_ntdll:
+    lea esi, [szNtdll]
+    mov edi, [ebx+48]
+    movzx ecx, word [ebx+44]
+    shr ecx, 1
+    rep cmpsw
+    or ecx, ecx
+    jnz .next_module
+
+    ;   found ntdll
+    mov eax, [ebx+24]
+    lea eax, [eax+0x77170]
+    mov [fnNtQuerySystemTime], eax
 
 .next_module:
     mov ebx, [ebx]
@@ -489,28 +485,28 @@ get_last_block:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 get_days:
-    push esi
-    push edx
-    xor edx, edx
-    mov eax, 86400
-    mul edi
-    mov esi, eax
-    mov edi, edx
-    xor eax, eax
+    push ebx
     push eax
-    call [fnTime64]
-    add esi, eax
-    adc edi, edx
-    mov [esp], edi
-    push esi
+    push eax
+    lea ebx, [esp]
+    push eax
+    push eax
+    invoke fnNtQuerySystemTime, esp
     push esp
-    call [fnLocalTime64]
-    add esp, 12
-    cinvoke fnMkTime64, eax
-    mov esi, 86400
-    div esi
+    xchg ebx, [esp]
+    push ebx
+    call [fnFileTimeToLocalFileTime]
+    pop eax
+    pop eax
+    pop eax
     pop edx
-    pop esi
+    shrd eax, edx, 14
+    shr edx, 14
+    mov ebx, 0x324a9a7
+    div ebx
+    xor edx, edx
+    lea eax, [eax+edi-134774]
+    pop ebx
     ret
 
 
@@ -1009,7 +1005,7 @@ on_command:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 x0r19x91:
-    call find_routines
+    call x0r19x91_init
     ;   edi - LoadLibrary, esi - GetProcAddress
     or ebx, -1
     push ebx
@@ -1126,8 +1122,8 @@ section '.res' data readable resource
     
     versioninfo ver_info,VOS__WINDOWS32,VFT_APP,VFT2_UNKNOWN,\
         LANG_ENGLISH+SUBLANG_DEFAULT,0,\
-        'FileVersion', '2.2.0',\
-        'ProductVersion', '2.2.0',\
+        'FileVersion', '2.3.0',\
+        'ProductVersion', '2.3.0',\
         'FileDescription', 'KeyGen for 010 Editor',\
         'ProductName', '010 Editor KeyGen',\
         'CompanyName', 'x0r19x91'
