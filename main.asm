@@ -900,9 +900,6 @@ update_license_key:
 
     ;   Get The Number of Days from the Selected Date
 
-    ;mov esi, ebx
-    ;mov edx, eax
-
     push edi
     invoke fnSystemTimeToFileTime, sysStartDate, sysFileTime
     mov esi, dword [sysFileTime]
@@ -910,6 +907,8 @@ update_license_key:
     invoke fnSystemTimeToFileTime, sysCurrDate, sysFileTime
     sub esi, dword [sysFileTime]
     sbb edi, dword [sysFileTime+4]
+    add esi, 0x2a69c000
+    adc edi, 0xc9
     shrd esi, edi, 14
     shr edi, 14
     mov eax, esi
