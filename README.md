@@ -10,8 +10,7 @@ It is only for educational purposes.
 
 1. Arbitrary usernames are supported
 
-2. License expiration date can be customized
-   The expiration date must be between the next day and December 31, 3000
+2. License expiration date can be customized (any date between the next day and December 31, 3000)
 
 3. N-User License Keys can be generated where 1 &le; N &le; 1000
 
