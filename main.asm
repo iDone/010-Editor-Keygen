@@ -32,7 +32,7 @@
 
 ;   The above ascii art is generated using http://patorjk.com/software/taag
 
-;   This Program is only 7168 bytes !
+;   This Program is only 6656 bytes !
 ;   I wrote the keygen first in C, using Visual Studio 2017
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
@@ -150,6 +150,7 @@ section '.data' data readable writable
     sysFileTime         dq      ?
 
     szKernel32          du      'KERNEL32.DLL', 0
+    szSmallKernel32     du      'kernel32.dll', 0
     szNtdll             du      'ntdll.dll', 0
 
     szUser32            db      'USER32.DLL', 0
@@ -321,7 +322,7 @@ section '.data' data readable writable
     ;   Template for dialog box
 
     tmpDialog           dd      DS_SETFONT or DS_FIXEDSYS or DS_MODALFRAME or WS_CAPTION or WS_SYSMENU
-                        dd      WS_EX_CLIENTEDGE or WS_EX_APPWINDOW
+                        dd      0
                         dw      13
                         dw      100, 100, 260, 114
                         
@@ -335,7 +336,7 @@ section '.data' data readable writable
                         align 4
                         dd      ES_LEFT+ES_AUTOHSCROLL+WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP
                         dd      0
-                        dw      34,12,65,12
+                        dw      34,12,69,12
                         dw      IDC_TEXT_NAME
                         dw      -1, 0x81
                         dw      0, 0
@@ -351,13 +352,13 @@ section '.data' data readable writable
                         align 4
                         dd      ES_LEFT+ES_AUTOHSCROLL+WS_CHILD+WS_VISIBLE+WS_BORDER+WS_TABSTOP+ES_NUMBER
                         dd      0
-                        dw      34,32,54,14
+                        dw      34,32,60,14
                         dw      IDC_TEXT_USERS
                         dw      -1, 0x81
                         dw      0, 0
 
                         align 4
-                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      WS_CHILD or WS_VISIBLE or WS_TABSTOP or BS_PUSHBUTTON
                         dd      0
                         dw      72,93,50,14
                         dw      IDC_BTN_COPY
@@ -366,7 +367,7 @@ section '.data' data readable writable
                         dw      0
 
                         align 4
-                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      WS_CHILD or WS_VISIBLE or WS_TABSTOP or BS_PUSHBUTTON
                         dd      0
                         dw      203,93,50,14
                         dw      IDC_BTN_INFO
@@ -375,7 +376,7 @@ section '.data' data readable writable
                         dw      0
 
                         align 4
-                        dd      BS_PUSHBUTTON+WS_CHILD+WS_VISIBLE+WS_TABSTOP
+                        dd      WS_CHILD or WS_VISIBLE or WS_TABSTOP or BS_PUSHBUTTON
                         dd      0
                         dw      7,93,59,14
                         dw      IDC_BTN_CLRREG
@@ -404,7 +405,7 @@ section '.data' data readable writable
                         align 4
                         dd      UDS_SETBUDDYINT+UDS_ARROWKEYS+WS_CHILD+WS_VISIBLE
                         dd      0
-                        dw      88,32,12,14
+                        dw      93,32,12,14
                         dw      IDC_SPIN_USERS
                         du      'msctls_updown32', 0
                         dw      0, 0
@@ -444,7 +445,10 @@ section '.data' data readable writable
                         du      'End Date', 0
                         dw      0
 
-
+    bIsWindows10        db      ?
+    
+    tabWindows7         dd      0x149d7, 0x11222, 0x2011c
+    tabWindows10        dd      0x24bf0, 0x178b0, 0x77170
 
 
 ;   +-----------------------------------------------------------------------+
@@ -455,6 +459,12 @@ section '.data' data readable writable
 
 section '.text' code readable executable
 
+get_version:
+
+    mov eax, [fs:0x30]          ;   PEB
+    cmp dword [eax+164], 10     ;   Major Version
+    setz [bIsWindows10]
+
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
 ;   |                   Function    :   init                                |
@@ -464,13 +474,13 @@ section '.text' code readable executable
 ;   |                       %edi -> Address of LoadLibrary                  |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
+
 init:
-    mov eax, [fs:0x30]      ;   PEB
-    mov eax, [eax+12]       ;   PEB_LDR_DATA
-    mov ebx, [eax+12]       ;   InLoadOrderModuleList
+    mov eax, [eax+12]           ;   PEB_LDR_DATA
+    mov ebx, [eax+12]           ;   InLoadOrderModuleList
     mov esi, ebx
 
-    ;   iterate InLoadOrderModuleList
+;   Iterate InLoadOrderModuleList
 
 .loop:
     movzx ecx, word [ebx+44]
@@ -479,14 +489,30 @@ init:
     mov edi, [ebx+48]
     rep cmpsw
     or ecx, ecx
-    jnz .is_ntdll
+    jnz .check_lcase_kernel32
 
-    ;   found kernel32
+;   Found kernel32
 
+.is_kernel32:
     mov eax, [ebx+24]
-    lea edi, [eax+0x24bf0]
-    lea esi, [eax+0x178b0]
+    movzx edi, [bIsWindows10]
+    shl edi, 2
+    lea edi, [edi+edi*2+tabWindows7]
+
+    mov esi, [edi+4]
+    add esi, eax
+    mov edi, [edi]
+    add edi, eax
     ret
+
+.check_lcase_kernel32:
+    lea esi, [szSmallKernel32]
+    mov edi, [ebx+48]
+    movzx ecx, word [ebx+44]
+    shr ecx, 1
+    rep cmpsw
+    or ecx, ecx
+    jz .is_kernel32
 
 .is_ntdll:
     lea esi, [szNtdll]
@@ -497,9 +523,14 @@ init:
     or ecx, ecx
     jnz .next_module
 
-    ;   found ntdll
+;   Found ntdll
+
     mov eax, [ebx+24]
-    lea eax, [eax+0x77170]
+    movzx edi, [bIsWindows10]
+    shl edi, 2
+    mov edi, [edi+edi*2+tabWindows7+8]
+    add eax, edi
+
     mov [fnNtQuerySystemTime], eax
 
 .next_module:
@@ -1127,7 +1158,7 @@ on_command:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 start:
-    call init
+    call get_version
     ;   edi - LoadLibrary, esi - GetProcAddress
     or ebx, -1
     push ebx
@@ -1180,23 +1211,9 @@ start:
 
 section '.res' data readable resource
 
-    directory RT_VERSION, version_info, RT_MANIFEST, manifest_info
+    directory RT_MANIFEST, manifest_info
     
-    resource version_info, 1, LANGUAGE_ID, ver_info
     resource manifest_info, 1, LANGUAGE_ID, m_info
-    
-    ;   ------------
-    ;   Version Info
-    ;   ------------
-    
-    versioninfo ver_info,VOS__WINDOWS32,VFT_APP,VFT2_UNKNOWN,\
-        LANG_ENGLISH+SUBLANG_DEFAULT,0,\
-        'FileVersion', '2.3.0',\
-        'ProductVersion', '2.3.0',\
-        'FileDescription', 'KeyGen for 010 Editor',\
-        'ProductName', '010 Editor KeyGen',\
-        'CompanyName', 'x0r19x91'
-
     ;   -----------------------------------
     ;   Manifest for enabling Visual Styles
     ;   -----------------------------------
