@@ -18,6 +18,11 @@ It is only for educational purposes.
 Here are the steps for Assembling
 
 1. Download [Flat Assembler](http://flatassembler.net/download.php)
+
+   or
+   
+   `sudo apt-get install fasm` from the terminal
+
 2. Assemble using the following command
 
    `fasm main.asm`
