@@ -21,13 +21,14 @@ Here are the steps for Assembling
 
    or
    
-   `sudo apt-get install fasm` from the terminal
+   If you are on Linux, you may use `sudo apt-get install fasm`
 
 2. Assemble using the following command
 
    `fasm main.asm`
 
 The current support is for Windows only.
+
 I'll be adding a linux executable soon
 
 ### License
