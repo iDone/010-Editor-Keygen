@@ -37,6 +37,14 @@
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
 
+;   +----------------------------+
+;   Removing the Import Directory
+;   +----------------------------+
+;   The program now reads each LDR_MODULE to find ntdll and kernel32
+;   It reads their export directories to find NtQuerySystemTime
+;   LoadLibrary and GetProcAddress
+;   It then uses the LoadLibrary and GetProcAddress to resolve other routines
+
 ;   Usage Instructions
 
 ;   +-----------------------------------------------------------------------+
