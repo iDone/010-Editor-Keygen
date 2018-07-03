@@ -80,12 +80,12 @@
 
 ;   We Need to Execute in Windows SubSystem
 
-    format PE GUI 6.0
+    format PE GUI 5.0
     include '\fasm\include\win32ax.inc'
 
 ;   Define the Entry Point and force FASM to generate 32 bit code
 
-    entry start
+    entry init
     use32
 
 
@@ -214,6 +214,9 @@ section '.data' data readable writable
     szRegCloseKey       db      'RegCloseKey', 0
     szRegQueryValueExA  db      'RegQueryValueExA', 0
     szFT2LFT            db      'FileTimeToLocalFileTime', 0
+    szGetProcAddress    db      'GetProcAddress', 0
+    szLoadLibrary       db      'LoadLibraryA', 0
+    szNtQuerySystemTime db      'NtQuerySystemTime', 0
 
     tabAdvapi32         dd      4
                         dd      szRegOpenKeyEx, fnRegOpenKeyEx
@@ -321,7 +324,7 @@ section '.data' data readable writable
 
     ;   Template for dialog box
 
-    tmpDialog           dd      DS_SETFONT or DS_FIXEDSYS or DS_MODALFRAME or WS_CAPTION or WS_SYSMENU
+    tmpDialog           dd      DS_SETFONT or DS_FIXEDSYS or WS_CAPTION or WS_SYSMENU
                         dd      0
                         dw      13
                         dw      100, 100, 260, 114
@@ -445,10 +448,14 @@ section '.data' data readable writable
                         du      'End Date', 0
                         dw      0
 
-    bIsWindows10        db      ?
-    
-    tabWindows7         dd      0x149d7, 0x11222, 0x2011c
-    tabWindows10        dd      0x24bf0, 0x178b0, 0x77170
+
+macro PUSH [reg] {
+    reverse push reg
+}
+
+macro POP [reg] {
+    forward pop reg
+}
 
 
 ;   +-----------------------------------------------------------------------+
@@ -459,11 +466,95 @@ section '.data' data readable writable
 
 section '.text' code readable executable
 
-get_version:
+string_length:
 
-    mov eax, [fs:0x30]          ;   PEB
-    cmp dword [eax+164], 10     ;   Major Version
-    setz [bIsWindows10]
+    PUSH ecx, edi
+    mov edi, eax
+    or ecx, -1
+    xor eax, eax
+    repnz scasb
+    inc ecx
+    not ecx
+    mov eax, ecx
+    POP ecx, edi
+    ret
+
+string_compare:
+
+    PUSH ebx, ecx, edi
+    mov eax, esi
+    call string_length
+    mov ecx, eax
+    mov eax, edi
+    call string_length
+    cmp ecx, eax
+    cmovg ecx, eax
+    xor eax, eax
+    repz cmpsb
+    setz al
+    shl eax, 1
+    or ecx, ecx
+    setz bl
+    or al, bl
+    cmp al, 3
+    setz al
+    POP ebx, ecx, edi
+    ret
+
+;
+;   Read export directory
+;
+;   Arguments:
+;       eax : module base
+;       edx : export name
+;
+read_export:
+
+    PUSH eax, ebx, ecx, edx, esi, edi
+    mov ebx, [eax+0x3c]                 ;   offset of pe header
+    add ebx, eax
+    movzx ecx, word [ebx+4+16]          ;   optional_header.size
+    add ebx, ecx
+    add ebx, 24
+    mov ebx, [ebx-128]                  ;   rva of export table
+    add ebx, [esp]                      ;   export directory
+    mov ebp, [ebx+24]                   ;   number of names
+    mov edi, edx
+    mov edx, [ebx+32]                   ;   name table rva
+    mov ecx, [ebx+36]                   ;   ordinal table rva
+    add edx, [esp]
+    add ecx, [esp]
+    sub ecx, 2
+    sub edx, 4
+
+.search:
+    dec ebp
+    js .no_section_found
+    add edx, 4
+    add ecx, 2
+    mov esi, [edx]
+    add esi, [esp]
+    call string_compare
+    or al, al
+    jz .search
+
+.finished:
+    mov eax, [ebx+28]                   ;   export addresses rva
+    add eax, [esp]
+    movzx ecx, word [ecx]
+    mov edx, [ebx+16]
+    sub ecx, edx
+    lea eax, [eax+edx*4]
+    mov eax, [eax+ecx*4]
+    pop ecx
+    add eax, ecx
+    POP ebx, ecx, edx, esi, edi
+    ret
+
+.no_section_found:
+    POP eax, ebx, ecx, edx, esi, edi
+    xor eax, eax
+    ret
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -476,6 +567,7 @@ get_version:
 ;   +-----------------------------------------------------------------------+
 
 init:
+    mov eax, [fs:0x30]          ;   PEB
     mov eax, [eax+12]           ;   PEB_LDR_DATA
     mov ebx, [eax+12]           ;   InLoadOrderModuleList
     mov esi, ebx
@@ -495,15 +587,14 @@ init:
 
 .is_kernel32:
     mov eax, [ebx+24]
-    movzx edi, [bIsWindows10]
-    shl edi, 2
-    lea edi, [edi+edi*2+tabWindows7]
-
-    mov esi, [edi+4]
-    add esi, eax
-    mov edi, [edi]
-    add edi, eax
-    ret
+    mov edx, szGetProcAddress
+    call read_export
+    mov esi, eax
+    mov eax, [ebx+24]
+    mov edx, szLoadLibrary
+    call read_export
+    mov edi, eax
+    jmp .ret
 
 .check_lcase_kernel32:
     lea esi, [szSmallKernel32]
@@ -526,11 +617,8 @@ init:
 ;   Found ntdll
 
     mov eax, [ebx+24]
-    movzx edi, [bIsWindows10]
-    shl edi, 2
-    mov edi, [edi+edi*2+tabWindows7+8]
-    add eax, edi
-
+    mov edx, szNtQuerySystemTime
+    call read_export
     mov [fnNtQuerySystemTime], eax
 
 .next_module:
@@ -539,7 +627,7 @@ init:
     jnz .loop
 
 .ret:
-    ret
+    jmp start
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -1158,7 +1246,6 @@ on_command:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 start:
-    call get_version
     ;   edi - LoadLibrary, esi - GetProcAddress
     or ebx, -1
     push ebx
