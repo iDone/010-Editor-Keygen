@@ -32,7 +32,7 @@
 
 ;   The above ascii art is generated using http://patorjk.com/software/taag
 
-;   This Program is only 6656 bytes !
+;   This Program is only 7168 bytes !
 ;   I wrote the keygen first in C, using Visual Studio 2017
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
