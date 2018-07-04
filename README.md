@@ -14,6 +14,8 @@ It is for *educational purposes* only.
 
 3. N-User License Keys can be generated where 1 &le; N &le; 1000
 
+You don't need C Runtime to run this program
+
 ### How to assemble
 Here are the steps for Assembling
 
