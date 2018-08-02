@@ -1,4 +1,4 @@
-# 010-k3yg3n
+# 010 Editor KeyGen
 
 A License Key generator for [010 Editor](http://www.sweetscape.com/download/010editor/)
 
