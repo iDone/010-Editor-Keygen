@@ -32,18 +32,10 @@
 
 ;   The above ascii art is generated using http://patorjk.com/software/taag
 
-;   This Program is only 7168 bytes !
+;   This Program is only 6260 bytes !
 ;   I wrote the keygen first in C, using Visual Studio 2017
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
-
-;   +----------------------------+
-;   Removing the Import Directory
-;   +----------------------------+
-;   The program now reads each LDR_MODULE to find ntdll and kernel32
-;   It reads their export directories to find NtQuerySystemTime
-;   LoadLibrary and GetProcAddress
-;   It then uses the LoadLibrary and GetProcAddress to resolve other routines
 
 ;   Usage Instructions
 
