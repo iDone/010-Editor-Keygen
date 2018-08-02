@@ -33,6 +33,10 @@ The current support is for Windows only.
 
 I'll be adding a linux executable soon
 
+### Screenshot
+
+![Screenshot](screenshot.gif)
+
 ### License
 
 [MIT](/LICENSE)
