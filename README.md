@@ -4,7 +4,7 @@ A License Key generator for [010 Editor](http://www.sweetscape.com/download/010e
 
 ### Warning
 
-It is for *educational purposes* only.
+It is for **educational purposes** only.
 
 ### Features
 
