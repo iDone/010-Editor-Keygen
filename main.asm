@@ -79,15 +79,80 @@
 ;   +-----------------------------------------------------------------------+
 
 ;   We Need to Execute in Windows SubSystem
+;
+;   Win32 Template
+;   Written by x0r19x91
+;
+;   Date : 22:47 29-08-2018
+;
 
-    format PE GUI 5.0
+    format PE GUI 6.0
+    entry main
     include '\fasm\include\win32ax.inc'
 
-;   Define the Entry Point and force FASM to generate 32 bit code
+struc UNICODE_STRING [bytes]
+{
+        .   dw  .size, .size
+            dd  .bytes
+    .bytes  du  bytes
+    .size   =   $-.bytes
+}
 
-    entry init
-    use32
+struc ANSI_STRING [bytes]
+{
+        .   dw  .size, .size
+            dd  .bytes
+    .bytes  db  bytes
+    .size   =   $-.bytes
+}
 
+macro init_dll dll_id, dll_name, [func_name]
+{
+    common
+        label dll_id
+        .size = 0
+    common
+        .dll  UNICODE_STRING dll_name
+        label .functions
+    forward
+        .size = .size + 1
+    forward
+        dd func_name, fn#func_name
+    forward
+        label func_name dword
+        .str ANSI_STRING `func_name
+    forward
+        label fn#func_name dword
+        dd  0
+}
+
+macro load_dll [dll_id]
+{
+    forward
+    push ebx
+    push ebx
+    local ..next, ..load_loop
+..next:
+    mov eax, esp
+    invoke fnLdrLoadDll, 1, 0, dll_id#.dll, eax
+    xor ebx, ebx
+..load_loop:
+    mov eax, [dll_id#.functions+ebx*8+4]
+    invoke fnLdrGetProcedureAddress, dword [esp+12], dword [dll_id#.functions+ebx*8], 0, eax
+    inc ebx
+    cmp ebx, dll_id#.size
+    jl ..load_loop
+    pop ebx
+    pop ebx
+}
+
+macro PUSH [reg] {
+    reverse push reg
+}
+
+macro POP [reg] {
+    forward pop reg
+}
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -121,14 +186,22 @@
 
 
 
-
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
 ;   |                              Global Data                              |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 
-section '.data' data readable writable
+section '.data' data readable writeable
+
+    fnLdrLoadDll                dd      0
+    fnLdrGetProcedureAddress    dd      0
+
+    data 9
+        .tls        dd  0, 0, .index, .callbacks, 0, 0
+        .callbacks  dd  initialize
+        .index      dd  0
+    end data
 
     szMsgBoxTitle       db      'Info', 0              ;   Our Message Box Title
     szHex               db      '0123456789ABCDEF'     ;   Hexadecimal translation table
@@ -149,113 +222,31 @@ section '.data' data readable writable
     sysEndDate      SYSTEMTIME  3000, 12, 3, 31, 23, 59, 59, 0
     sysFileTime         dq      ?
 
-    szKernel32          du      'KERNEL32.DLL', 0
-    szSmallKernel32     du      'kernel32.dll', 0
-    szNtdll             du      'ntdll.dll', 0
+    ;
+    ; Declaring imports in a dll
+    ; init_dll [dll_id], [dll_name], [function_1], [function_2], ...
+    ;
+    ; For Example
+    ; init_dll user32, 'user32.dll', MessageBoxTimeoutA
+    ; init_dll kernel32, 'kernel32.dll', ExitProcess
+    ;
+    init_dll kernel32, 'kernel32.dll',\
+        FormatMessageA, ExitProcess, GlobalAlloc, GlobalLock,\
+        HeapAlloc, HeapFree, LocalFree, GetLocalTime,\
+        SystemTimeToFileTime, FileTimeToSystemTime,\
+        GlobalUnlock, FileTimeToLocalFileTime
 
-    szUser32            db      'USER32.DLL', 0
-    szMsvcrt            db      'MSVCRT.DLL', 0
-    szAdvapi32          db      'ADVAPI32.DLL', 0
-    szKernel32A         db      'KERNEL32.DLL', 0
+    init_dll advapi32, 'advapi32.dll',\
+        RegOpenKeyExA, RegDeleteTreeA, RegCloseKey, RegQueryValueExA
 
-    fnExitProcess       dd      ?
-    fnGlobalAlloc       dd      ?
-    fnGlobalLock        dd      ?
-    fnGlobalUnlock      dd      ?
-    fnGetProcessHeap    dd      ?
-    fnHeapAlloc         dd      ?
-    fnHeapFree          dd      ?
-    fnFormatMessage     dd      ?
-    fnLocalFree         dd      ?
-    fnGetLocalTime      dd      ?
-    fnSystemTimeToFileTime      dd      ?
-    fnFileTimeToSystemTime      dd      ?
-    fnFileTimeToLocalFileTime   dd      ?
-    fnRegOpenKeyEx      dd      ?
-    fnRegDeleteTree     dd      ?
-    fnRegCloseKey       dd      ?
-    fnRegQueryValueEx   dd      ?
-    fnSendMessage       dd      ?
-    fnOpenClipboard     dd      ?
-    fnEmptyClipboard    dd      ?
-    fnGetDlgItem        dd      ?
-    fnSetClipboardData  dd      ?
-    fnCloseClipboard    dd      ?
-    fnPostQuitMessage   dd      ?
-    fnGetDlgItemInt     dd      ?
-    fnMessageBox        dd      ?
-    fnNtQuerySystemTime dd      ?
-    fnDialogBoxIParam   dd      ?
+    init_dll ntdll, 'ntdll.dll', NtQuerySystemTime
 
-    szSendMessageA      db      'SendMessageA', 0
-    szOpenClipboard     db      'OpenClipboard', 0
-    szEmptyClipboard    db      'EmptyClipboard', 0
-    szGetDlgItem        db      'GetDlgItem', 0
-    szSetClipboardData  db      'SetClipboardData', 0
-    szCloseClipboard    db      'CloseClipboard', 0
-    szDialogBoxIParam   db      'DialogBoxIndirectParamA', 0
-    szPostQuitMessage   db      'PostQuitMessage', 0
-    szGetDlgItemInt     db      'GetDlgItemInt', 0
-    szMessageBoxA       db      'MessageBoxA', 0
-    szExitProcess       db      'ExitProcess', 0
-    szGlobalAlloc       db      'GlobalAlloc', 0
-    szGlobalLock        db      'GlobalLock', 0
-    szGlobalUnlock      db      'GlobalUnlock', 0
-    szGetProcessHeap    db      'GetProcessHeap', 0
-    szHeapAlloc         db      'HeapAlloc', 0
-    szHeapFree          db      'HeapFree', 0
-    szFormatMessageA    db      'FormatMessageA', 0
-    szLocalFree         db      'LocalFree', 0
-    szGetLocalTime      db      'GetLocalTime', 0
-    szSysTime2FileTime  db      'SystemTimeToFileTime', 0
-    szFileTime2SysTime  db      'FileTimeToSystemTime', 0
-    szRegOpenKeyEx      db      'RegOpenKeyExA', 0
-    szRegDeleteTree     db      'RegDeleteTreeA', 0
-    szRegCloseKey       db      'RegCloseKey', 0
-    szRegQueryValueExA  db      'RegQueryValueExA', 0
-    szFT2LFT            db      'FileTimeToLocalFileTime', 0
-    szGetProcAddress    db      'GetProcAddress', 0
-    szLoadLibrary       db      'LoadLibraryA', 0
-    szNtQuerySystemTime db      'NtQuerySystemTime', 0
+    init_dll user32, 'user32.dll',\
+        SendMessageA, OpenClipboard, EmptyClipboard, GetDlgItem,\
+        SetClipboardData, CloseClipboard, DialogBoxIndirectParamA,\
+        PostQuitMessage, GetDlgItemInt, MessageBoxA
 
-    tabAdvapi32         dd      4
-                        dd      szRegOpenKeyEx, fnRegOpenKeyEx
-                        dd      szRegDeleteTree, fnRegDeleteTree
-                        dd      szRegCloseKey, fnRegCloseKey
-                        dd      szRegQueryValueExA, fnRegQueryValueEx
-    tabKernel32         dd      13
-                        dd      szExitProcess, fnExitProcess
-                        dd      szGlobalAlloc, fnGlobalAlloc
-                        dd      szGlobalLock, fnGlobalLock
-                        dd      szGlobalUnlock, fnGlobalUnlock
-                        dd      szGetProcessHeap, fnGetProcessHeap
-                        dd      szHeapAlloc, fnHeapAlloc
-                        dd      szHeapFree, fnHeapFree
-                        dd      szFormatMessageA, fnFormatMessage
-                        dd      szLocalFree, fnLocalFree
-                        dd      szGetLocalTime, fnGetLocalTime
-                        dd      szSysTime2FileTime, fnSystemTimeToFileTime
-                        dd      szFileTime2SysTime, fnFileTimeToSystemTime
-                        dd      szFT2LFT, fnFileTimeToLocalFileTime
-    tabUser32           dd      10
-                        dd      szSendMessageA, fnSendMessage
-                        dd      szOpenClipboard, fnOpenClipboard
-                        dd      szEmptyClipboard, fnEmptyClipboard
-                        dd      szGetDlgItem, fnGetDlgItem
-                        dd      szSetClipboardData, fnSetClipboardData
-                        dd      szCloseClipboard, fnCloseClipboard
-                        dd      szDialogBoxIParam, fnDialogBoxIParam
-                        dd      szPostQuitMessage, fnPostQuitMessage
-                        dd      szGetDlgItemInt, fnGetDlgItemInt
-                        dd      szMessageBoxA, fnMessageBox
-
-    pTables             dd      3
-                        dd      szKernel32A, tabKernel32
-                        dd      szAdvapi32, tabAdvapi32
-                        dd      szUser32, tabUser32
-
-
-    ;   Path to Registry Key for querying the existence of a registered user
+        ;   Path to Registry Key for querying the existence of a registered user
     ;   Also used for deleting the 'CLASSES' SubKey
     
     szPath              db      'SOFTWARE\SweetScape\010 Editor', 0
@@ -448,186 +439,104 @@ section '.data' data readable writable
                         du      'End Date', 0
                         dw      0
 
-
-macro PUSH [reg] {
-    reverse push reg
-}
-
-macro POP [reg] {
-    forward pop reg
-}
-
-
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
 ;   |                             Text Section                              |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 
-section '.text' code readable executable
+section '.text' code executable
 
-string_length:
+    LDR_LOAD_DLL    =   26c4b1f1h
+    LDR_GETPROC     =   69a5e1fbh
 
-    PUSH ecx, edi
-    mov edi, eax
-    or ecx, -1
+jenkins_hash:
+    push ebx
     xor eax, eax
-    repnz scasb
-    inc ecx
-    not ecx
-    mov eax, ecx
-    POP ecx, edi
+@@:
+    movzx ebx, byte [esi]
+    or bl, bl
+    jz @f
+    add eax, ebx
+    mov ebx, eax
+    shl ebx, 10
+    add eax, ebx
+    mov ebx, eax
+    shr ebx, 6
+    xor eax, ebx
+    inc esi
+    jmp @b
+@@:
+    mov ebx, eax
+    shl ebx, 3
+    add eax, ebx
+    mov ebx, eax
+    shr ebx, 11
+    xor eax, ebx
+    mov ebx, eax
+    shl ebx, 15
+    add eax, ebx
+    pop ebx
     ret
 
-string_compare:
 
-    PUSH ebx, ecx, edi
-    mov eax, esi
-    call string_length
-    mov ecx, eax
-    mov eax, edi
-    call string_length
-    cmp ecx, eax
-    cmovg ecx, eax
-    xor eax, eax
-    repz cmpsb
-    setz al
-    shl eax, 1
-    or ecx, ecx
-    setz bl
-    or al, bl
-    cmp al, 3
-    setz al
-    POP ebx, ecx, edi
+initialize:
+    PUSH ebx, ecx, edx, esi, edi, ebp
+    mov eax, [fs:0x30]
+    mov eax, [eax+12]
+    mov eax, [eax+0x1c]
+    mov ebx, [eax+8]
+    mov eax, [ebx+0x3c]
+    mov eax, [eax+ebx+24+96]
+    add eax, ebx
+    push eax
+    mov ecx, [eax+24]
+    mov ebp, [eax+32]   ; name table
+    mov edx, [eax+36]   ; ordinal table
+    add edx, ebx
+    add ebp, ebx
+    xor edi, edi
+
+.search_loop:
+    mov esi, [ebp]
+    add esi, ebx
+    call jenkins_hash
+    cmp eax, LDR_LOAD_DLL
+    jnz .is_proc_addr
+    inc edi
+    movzx eax, word [edx]
+    mov [fnLdrLoadDll], eax
+    jmp .next_func
+
+.is_proc_addr:
+    cmp eax, LDR_GETPROC
+    jnz .next_func
+    inc edi
+    movzx eax, word [edx]
+    mov [fnLdrGetProcedureAddress], eax
+
+.next_func:
+    add edx, 2
+    add ebp, 4
+    cmp edi, 2
+    jz @f
+    dec ecx
+    jnz .search_loop
+
+@@:
+    pop edi
+    mov edx, [edi+28]
+    add edx, ebx
+    mov eax, [fnLdrLoadDll]
+    mov ecx, [edx+eax*4]
+    add ecx, ebx
+    mov [fnLdrLoadDll], ecx
+    mov eax, [fnLdrGetProcedureAddress]
+    mov ecx, [edx+eax*4]
+    add ecx, ebx
+    mov [fnLdrGetProcedureAddress], ecx
+    POP ebx, ecx, edx, esi, edi, ebp
     ret
-
-;
-;   Read export directory
-;
-;   Arguments:
-;       eax : module base
-;       edx : export name
-;
-read_export:
-
-    PUSH eax, ebx, ecx, edx, esi, edi
-    mov ebx, [eax+0x3c]                 ;   offset of pe header
-    add ebx, eax
-    movzx ecx, word [ebx+4+16]          ;   optional_header.size
-    add ebx, ecx
-    add ebx, 24
-    mov ebx, [ebx-128]                  ;   rva of export table
-    add ebx, [esp]                      ;   export directory
-    mov ebp, [ebx+24]                   ;   number of names
-    mov edi, edx
-    mov edx, [ebx+32]                   ;   name table rva
-    mov ecx, [ebx+36]                   ;   ordinal table rva
-    add edx, [esp]
-    add ecx, [esp]
-    sub ecx, 2
-    sub edx, 4
-
-.search:
-    dec ebp
-    js .no_section_found
-    add edx, 4
-    add ecx, 2
-    mov esi, [edx]
-    add esi, [esp]
-    call string_compare
-    or al, al
-    jz .search
-
-.finished:
-    mov eax, [ebx+28]                   ;   export addresses rva
-    add eax, [esp]
-    movzx ecx, word [ecx]
-    mov edx, [ebx+16]
-    sub ecx, edx
-    lea eax, [eax+edx*4]
-    mov eax, [eax+ecx*4]
-    pop ecx
-    add eax, ecx
-    POP ebx, ecx, edx, esi, edi
-    ret
-
-.no_section_found:
-    POP eax, ebx, ecx, edx, esi, edi
-    xor eax, eax
-    ret
-
-;   +-----------------------------------------------------------------------+
-;   |                                                                       |
-;   |                   Function    :   init                                |
-;   |                   Arguments   :   -                                   |
-;   |                   Returns     :   %esi, %edi                          |
-;   |                       %esi -> Address of GetProcAddress               |
-;   |                       %edi -> Address of LoadLibrary                  |
-;   |                                                                       |
-;   +-----------------------------------------------------------------------+
-
-init:
-    mov eax, [fs:0x30]          ;   PEB
-    mov eax, [eax+12]           ;   PEB_LDR_DATA
-    mov ebx, [eax+12]           ;   InLoadOrderModuleList
-    mov esi, ebx
-
-;   Iterate InLoadOrderModuleList
-
-.loop:
-    movzx ecx, word [ebx+44]
-    shr ecx, 1
-    lea esi, [szKernel32]
-    mov edi, [ebx+48]
-    rep cmpsw
-    or ecx, ecx
-    jnz .check_lcase_kernel32
-
-;   Found kernel32
-
-.is_kernel32:
-    mov eax, [ebx+24]
-    mov edx, szGetProcAddress
-    call read_export
-    mov esi, eax
-    mov eax, [ebx+24]
-    mov edx, szLoadLibrary
-    call read_export
-    mov edi, eax
-    jmp .ret
-
-.check_lcase_kernel32:
-    lea esi, [szSmallKernel32]
-    mov edi, [ebx+48]
-    movzx ecx, word [ebx+44]
-    shr ecx, 1
-    rep cmpsw
-    or ecx, ecx
-    jz .is_kernel32
-
-.is_ntdll:
-    lea esi, [szNtdll]
-    mov edi, [ebx+48]
-    movzx ecx, word [ebx+44]
-    shr ecx, 1
-    rep cmpsw
-    or ecx, ecx
-    jnz .next_module
-
-;   Found ntdll
-
-    mov eax, [ebx+24]
-    mov edx, szNtQuerySystemTime
-    call read_export
-    mov [fnNtQuerySystemTime], eax
-
-.next_module:
-    mov ebx, [ebx]
-    cmp ebx, esi
-    jnz .loop
-
-.ret:
-    jmp start
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -646,7 +555,7 @@ to_upper:
     jl @f
     cmp bl, 122
     jg @f
-    lea ebx, [ebx-32]
+    sub ebx, 32
 @@:
     ret
 
@@ -863,7 +772,7 @@ generate_license_key:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 copy_license:
-    invoke fnSendMessage, [hStaticSerial], WM_GETTEXTLENGTH, 0, 0
+    invoke fnSendMessageA, [hStaticSerial], WM_GETTEXTLENGTH, 0, 0
     and eax, eax
     jz .ret
     push ebx
@@ -876,7 +785,7 @@ copy_license:
     mov esi, eax
     invoke fnGlobalLock, eax
     push eax
-    invoke fnSendMessage, [hStaticSerial], WM_GETTEXT, ebx, eax
+    invoke fnSendMessageA, [hStaticSerial], WM_GETTEXT, ebx, eax
     call [fnGlobalUnlock]
     invoke fnSetClipboardData, CF_TEXT, esi
     invoke fnCloseClipboard
@@ -904,7 +813,8 @@ on_close:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 on_init_dialog:
-    invoke fnGetProcessHeap
+    mov eax, [fs:0x30]
+    mov eax, [eax+0x18]
     mov [hHeap], eax
 
     invoke fnGetLocalTime, sysCurrDate
@@ -933,15 +843,15 @@ on_init_dialog:
     invoke fnGetDlgItem, ebp, IDC_DATE_DAYS
     mov [hDatePicker], eax
 
-    invoke fnSendMessage, [hSpinUsers], UDM_SETBUDDY, [hTextUsers], 0
-    invoke fnSendMessage, [hSpinUsers], UDM_SETRANGE32, 1, 0x3e8
-    invoke fnSendMessage, [hSpinUsers], UDM_SETPOS, 0, 1
-    invoke fnSendMessage, [hTextUsers], EM_SETLIMITTEXT, 4, 0
-    invoke fnSendMessage, [hDatePicker], DTM_SETRANGE, 3, sysStartDate
+    invoke fnSendMessageA, [hSpinUsers], UDM_SETBUDDY, [hTextUsers], 0
+    invoke fnSendMessageA, [hSpinUsers], UDM_SETRANGE32, 1, 0x3e8
+    invoke fnSendMessageA, [hSpinUsers], UDM_SETPOS, 0, 1
+    invoke fnSendMessageA, [hTextUsers], EM_SETLIMITTEXT, 4, 0
+    invoke fnSendMessageA, [hDatePicker], DTM_SETRANGE, 3, sysStartDate
 
     call $+22
     db 'ddd, MMM d, yyyy', 0
-    invoke fnSendMessage, [hDatePicker], DTM_SETFORMAT, 0
+    invoke fnSendMessageA, [hDatePicker], DTM_SETFORMAT, 0
 
     ;   Prefer short jumps :-)
     
@@ -960,7 +870,7 @@ clear_license_display:
     invoke fnHeapFree, [hHeap], 0, edi
 @@:
     lea eax, [szLicense+24]    
-    invoke fnSendMessage, [hStaticSerial], WM_SETTEXT, 0, eax
+    invoke fnSendMessageA, [hStaticSerial], WM_SETTEXT, 0, eax
 
 .ret:
     mov eax, 1
@@ -973,7 +883,7 @@ clear_license_display:
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 update_license_key:
-    invoke fnSendMessage, [hTextName], WM_GETTEXTLENGTH, 0, 0
+    invoke fnSendMessageA, [hTextName], WM_GETTEXTLENGTH, 0, 0
     or eax, eax
     clc
     
@@ -1000,10 +910,10 @@ update_license_key:
     jz clear_license_display
     mov edi, eax
     
-    invoke fnSendMessage, [hTextName], WM_GETTEXT, esi, eax
+    invoke fnSendMessageA, [hTextName], WM_GETTEXT, esi, eax
     invoke fnGetDlgItemInt, ebp, IDC_TEXT_USERS, NULL, FALSE
     mov ebx, eax
-    invoke fnSendMessage, [hDatePicker], DTM_GETSYSTEMTIME, 0, sysStartDate
+    invoke fnSendMessageA, [hDatePicker], DTM_GETSYSTEMTIME, 0, sysStartDate
     test eax, eax
     stc
     js clear_license_display
@@ -1045,7 +955,7 @@ update_license_key:
     ;   -------------------------------------------------
     
     call generate_license_key
-    invoke fnSendMessage, [hStaticSerial], WM_SETTEXT, 0, szLicense
+    invoke fnSendMessageA, [hStaticSerial], WM_SETTEXT, 0, szLicense
     
     ;   -----------------------------------------------
     ;   Free the memory allocated for storing username
@@ -1094,12 +1004,12 @@ clear_registry:
     db 'CLASSES', 0
     push eax
     
-    invoke fnRegOpenKeyEx, HKEY_CURRENT_USER, szPath, 0, DELETE_FLAGS, esp
+    invoke fnRegOpenKeyExA, HKEY_CURRENT_USER, szPath, 0, DELETE_FLAGS, esp
     mov ebx, [esp]
 
     ;   Delete the tree pointed by the 'CLASSES' subkey
 
-    call [fnRegDeleteTree]
+    call [fnRegDeleteTreeA]
     invoke fnRegCloseKey, ebx
 
     jmp on_notify.ret
@@ -1115,7 +1025,7 @@ clear_registry:
 get_info:
     xor eax, eax
     push eax
-    invoke fnRegOpenKeyEx, HKEY_CURRENT_USER, szPath, 0, KEY_QUERY_VALUE, esp
+    invoke fnRegOpenKeyExA, HKEY_CURRENT_USER, szPath, 0, KEY_QUERY_VALUE, esp
     or eax, eax
     clc
     jnz @f
@@ -1132,7 +1042,7 @@ get_info:
     ;   ----------------------------------------------
     
     push 1024
-    invoke fnRegQueryValueEx, edi, szNameKey, 0, 0, ebx, esp
+    invoke fnRegQueryValueExA, edi, szNameKey, 0, 0, ebx, esp
     cmp eax, 2
     stc
     
@@ -1142,7 +1052,7 @@ get_info:
     
     jz @f
     mov dword [esp], 32
-    invoke fnRegQueryValueEx, edi, szPassword, 0, 0, esi, esp
+    invoke fnRegQueryValueExA, edi, szPassword, 0, 0, esi, esp
     cmp eax, 2
     stc
 
@@ -1164,8 +1074,8 @@ get_info:
     push ebx
     lea edi, [esp+8]
     
-    invoke fnFormatMessage, FORMAT_FLAGS, szRegMsg, 0, 0, edi, 1, esp
-    invoke fnMessageBox, ebp, dword [edi], szMsgBoxTitle, MB_ICONINFORMATION
+    invoke fnFormatMessageA, FORMAT_FLAGS, szRegMsg, 0, 0, edi, 1, esp
+    invoke fnMessageBoxA, ebp, dword [edi], szMsgBoxTitle, MB_ICONINFORMATION
 
     ;   -------------------------
     ;   Free the memory allocated
@@ -1194,7 +1104,7 @@ get_info:
     popf
     sbb eax, eax
     neg eax
-    invoke fnMessageBox, ebp, [szMessages+eax*4], szMsgBoxTitle, MB_ICONWARNING
+    invoke fnMessageBoxA, ebp, [szMessages+eax*4], szMsgBoxTitle, MB_ICONWARNING
     jmp get_info.ret
 
 
@@ -1245,48 +1155,11 @@ on_command:
 ;   |                              Entry Point                              |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-start:
-    ;   edi - LoadLibrary, esi - GetProcAddress
-    or ebx, -1
-    push ebx
-    push ebx
-
-.load_library:
-    mov ebx, [esp+4]
-    inc ebx
-    cmp ebx, [pTables]
-    mov [esp+4], ebx
-    jz .show_dialog_box
-    
-    push [pTables+ebx*8+4]
-    call edi
-    mov ebp, eax
-    mov ebx, [pTables+ebx*8+8]
-    mov dword [esp], -1
-
-.load_routines:
-    mov eax, [esp]
-    inc eax
-    cmp eax, [ebx]
-    mov [esp], eax
-    jz .load_library
-
-    push dword [ebx+eax*8+4]
-    push ebp
-    call esi
-
-    mov edx, [esp]
-    mov edx, [ebx+edx*8+8]
-    mov [edx], eax
-    jmp .load_routines
-
-
-.show_dialog_box:
-    pop eax
-    pop eax
+main:
+    load_dll ntdll, kernel32, advapi32, user32
     mov eax, [fs:0x30]
     mov eax, [eax+8]
-    invoke fnDialogBoxIParam, eax, tmpDialog, NULL, dialog_callback, NULL
+    invoke fnDialogBoxIndirectParamA, eax, tmpDialog, NULL, dialog_callback, NULL
     invoke fnExitProcess, 0
 
 
