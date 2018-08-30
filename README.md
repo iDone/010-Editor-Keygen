@@ -3,11 +3,11 @@
 A License Key generator for [010 Editor](http://www.sweetscape.com/download/010editor/).
 Written purely in Assembly
 
-### Warning
+## Warning
 
 It is for **educational purposes** only.
 
-### Features
+## Features
 
 1. Arbitrary usernames are supported
 
@@ -17,7 +17,7 @@ It is for **educational purposes** only.
 
 You **DON'T NEED MSVCRT** to run this program
 
-### How to assemble
+## How to assemble
 Here are the steps for Assembling
 
 1. Download [Flat Assembler](http://flatassembler.net/download.php)
@@ -34,10 +34,10 @@ The current support is for Windows only.
 
 I'll be adding a linux executable soon
 
-### Screenshot
+## Screenshot
 
 ![Screenshot](screenshot.gif)
 
-### License
+## License
 
 [MIT](/LICENSE)
