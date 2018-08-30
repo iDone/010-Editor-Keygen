@@ -114,7 +114,7 @@ struc ANSI_STRING [bytes]
 ;   For the above example, the table created is this
 ;
 ;   kernel32:
-;       .dll                du  "kernel32.dll"
+;       .dll                UNICODE_STRING  "kernel32.dll"
 ;       .functions          dd  aExitProcess, fnExitProcess
 ;                           dd  aWriteFile, fnWriteFile
 ;                           dd  aFormatMessageA, fnFormatMessageA
