@@ -1,6 +1,7 @@
 # 010 Editor KeyGen
 
-A License Key generator for [010 Editor](http://www.sweetscape.com/download/010editor/)
+A License Key generator for [010 Editor](http://www.sweetscape.com/download/010editor/).
+Written purely in Assembly
 
 ### Warning
 
