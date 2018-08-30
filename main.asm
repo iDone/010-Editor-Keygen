@@ -32,10 +32,15 @@
 
 ;   The above ascii art is generated using http://patorjk.com/software/taag
 
-;   This Program is only 6260 bytes !
+;   This Program is only 6912 bytes !
 ;   I wrote the keygen first in C, using Visual Studio 2017
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
+
+
+;   There is no import table. The functions are loaded at runtime via
+;   ntdll!LdrLoadDll and ntdll!LdrGetProcedureAddress
+
 
 ;   Usage Instructions
 
@@ -67,8 +72,6 @@
 ;   |           3.  Any License can be valid for atmost 983 years           |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-
-;   +-----------------------------------------------------------------------+
 ;   |                             LICENSE TYPES                             |
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -77,14 +80,6 @@
 ;   |               3.  1000 User License (Site License)                    |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
-
-;   We Need to Execute in Windows SubSystem
-;
-;   Win32 Template
-;   Written by x0r19x91
-;
-;   Date : 22:47 29-08-2018
-;
 
     format PE GUI 6.0
     entry main
@@ -106,26 +101,59 @@ struc ANSI_STRING [bytes]
     .size   =   $-.bytes
 }
 
+;
+;   Create a table of function names for each dll
+;   Usage:
+;       init_dll kernel32, 'kernel32.dll',\
+;           ExitProcess, WriteFile, FormatMessageA
+;
+;   Creates a table that consists of the dll name (unicode_string)
+;   followed by a table consisting of function name and a pointer to the
+;   location where the function address will be placed
+;
+;   For the above example, the table created is this
+;
+;   kernel32:
+;       .dll                du  "kernel32.dll"
+;       .functions          dd  aExitProcess, fnExitProcess
+;                           dd  aWriteFile, fnWriteFile
+;                           dd  aFormatMessageA, fnFormatMessageA
+;       .size               =   3
+;       aExitProcess        ANSI_STRING 'ExitProcess'
+;       aWriteFile          ANSI_STRING 'WriteFile'
+;       aFormatMessageA     ANSI_STRING 'FormatMessageA'
+;       fnExitProcess       dd  0
+;       fnWriteFile         dd  0
+;       fnFormatMessageA    dd  0
+;
+
 macro init_dll dll_id, dll_name, [func_name]
 {
     common
         label dll_id
         .size = 0
     common
-        .dll  UNICODE_STRING dll_name
+        .dll  UNICODE_STRING dll_name       ;   LdrLoadDll requires UNICODE_STRING
         label .functions
     forward
-        .size = .size + 1
+        .size = .size + 1                   ;   No. of functions required to be imported
     forward
-        dd func_name, fn#func_name
+        dd a#func_name, fn#func_name
     forward
-        label func_name dword
-        .str ANSI_STRING `func_name
+        label a#func_name dword             ;   Name of the function
+        .str ANSI_STRING `func_name         ;   LdrGetProcedureAddress requires ANSI_STRING
     forward
-        label fn#func_name dword
+        label fn#func_name dword            ;   Address of the function
         dd  0
 }
 
+;
+;   Emits code to resolve functions specified by 'dll_id'
+;   To use this macro, one must call init_dll macro before
+;
+;   Usage:
+;       load_dll dll_id_1, dll_id_2, ...
+;
 macro load_dll [dll_id]
 {
     forward
