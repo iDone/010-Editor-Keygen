@@ -5,7 +5,7 @@ Written purely in Assembly
 
 ## Warning
 
-It is for **educational purposes** only.
+It is for **EDUCATIONAL PURPOSES** only.
 
 ## Features
 
