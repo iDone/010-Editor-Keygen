@@ -32,15 +32,10 @@
 
 ;   The above ascii art is generated using http://patorjk.com/software/taag
 
-;   This Program is only 6436 bytes !
+;   This Program is only 6260 bytes !
 ;   I wrote the keygen first in C, using Visual Studio 2017
 ;   The Binary Produced by Visual Studio is 68,608 Bytes
 ;   So, I wrote it using Flat Assembler (FASM)
-
-
-;   There is no import table. The functions are loaded at runtime via
-;   ntdll!LdrLoadDll and ntdll!LdrGetProcedureAddress
-
 
 ;   Usage Instructions
 
@@ -72,6 +67,8 @@
 ;   |           3.  Any License can be valid for atmost 983 years           |
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
+
+;   +-----------------------------------------------------------------------+
 ;   |                             LICENSE TYPES                             |
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
@@ -81,105 +78,62 @@
 ;   |                                                                       |
 ;   +-----------------------------------------------------------------------+
 
+;   We Need to Execute in Windows SubSystem
+;
+;   Win32 Template
+;   Written by x0r19x91
+;
+;   Date : 22:47 29-08-2018
+;
+
     format PE GUI 6.0
-    entry main
+    entry initialize
     include '\fasm\include\win32ax.inc'
-
-struc UNICODE_STRING [bytes]
-{
-        .   dw  .size, .size
-            dd  .bytes
-    .bytes  du  bytes
-    .size   =   $-.bytes
-}
-
-struc ANSI_STRING [bytes]
-{
-        .   dw  .size, .size
-            dd  .bytes
-    .bytes  db  bytes
-    .size   =   $-.bytes
-}
-
-;
-;   Create a table of function names for each dll
-;   Usage:
-;       init_dll kernel32, 'kernel32.dll',\
-;           ExitProcess, WriteFile, FormatMessageA
-;
-;   Creates a table that consists of the dll name (unicode_string)
-;   followed by a table consisting of function name and a pointer to the
-;   location where the function address will be placed
-;
-;   For the above example, the table created is this
-;
-;   kernel32:
-;       .dll                UNICODE_STRING  "kernel32.dll"
-;       .functions          dd  aExitProcess, fnExitProcess
-;                           dd  aWriteFile, fnWriteFile
-;                           dd  aFormatMessageA, fnFormatMessageA
-;       .size               =   3
-;       aExitProcess        ANSI_STRING 'ExitProcess'
-;       aWriteFile          ANSI_STRING 'WriteFile'
-;       aFormatMessageA     ANSI_STRING 'FormatMessageA'
-;       fnExitProcess       dd  0
-;       fnWriteFile         dd  0
-;       fnFormatMessageA    dd  0
-;
 
 macro init_dll dll_id, dll_name, [func_name]
 {
     common
         label dll_id
         .size = 0
-    common
-        .dll  UNICODE_STRING dll_name       ;   LdrLoadDll requires UNICODE_STRING
+        .dll db dll_name, 0
         label .functions
     forward
-        .size = .size + 1                   ;   No. of functions required to be imported
+        .size = .size + 1
     forward
-        dd a#func_name, fn#func_name
+        dd func_name, fn#func_name
     forward
-        label a#func_name dword             ;   Name of the function
-        .str ANSI_STRING `func_name         ;   LdrGetProcedureAddress requires ANSI_STRING
+        label func_name dword
+        .str db `func_name, 0
     forward
-        label fn#func_name dword            ;   Address of the function
+        label fn#func_name dword
         dd  0
 }
 
-;
-;   Emits code to resolve functions specified by 'dll_id'
-;   To use this macro, one must call init_dll macro before
-;
-;   Usage:
-;       load_dll dll_id_1, dll_id_2, ...
-;
+macro push [reg] { forward push reg }
+macro pop [reg] { reverse pop reg }
+
 macro load_dll [dll_id]
 {
     forward
     push ebx
-    push ebx
+    push esi
+    push edx
     local ..next, ..load_loop
 ..next:
     mov eax, esp
-    invoke fnLdrLoadDll, 1, 0, dll_id#.dll, eax
+    invoke fnLoadLibraryEx, dll_id#.dll, 0, 0
+    mov esi, eax
     xor ebx, ebx
 ..load_loop:
-    mov eax, [dll_id#.functions+ebx*8+4]
-    invoke fnLdrGetProcedureAddress, dword [esp+12], dword [dll_id#.functions+ebx*8], 0, eax
+    invoke fnGetProcAddress, esi, dword [dll_id#.functions+ebx*8]
+    mov edx, [dll_id#.functions+ebx*8+4]
+    mov [edx], eax
     inc ebx
     cmp ebx, dll_id#.size
     jl ..load_loop
+    pop edx
+    pop esi
     pop ebx
-    pop ebx
-}
-
-macro PUSH [reg] {
-    reverse push reg
-}
-
-macro POP [reg] {
-    forward pop reg
 }
 
 ;   +-----------------------------------------------------------------------+
@@ -222,14 +176,8 @@ macro POP [reg] {
 
 section '.data' data readable writeable
 
-    fnLdrLoadDll                dd      0
-    fnLdrGetProcedureAddress    dd      0
-
-    data 9
-        .tls        dd  0, 0, .index, .callbacks, 0, 0
-        .callbacks  dd  initialize
-        .index      dd  0
-    end data
+    fnGetProcAddress    dd  0
+    fnLoadLibraryEx     dd  0
 
     szMsgBoxTitle       db      'Info', 0              ;   Our Message Box Title
     szHex               db      '0123456789ABCDEF'     ;   Hexadecimal translation table
@@ -443,7 +391,7 @@ section '.data' data readable writeable
 
                         align 4
                         dd      SS_CENTER+WS_CHILD+WS_VISIBLE+WS_GROUP
-                        dd      0x00020000
+                        dd      0
                         dw      70,64,120,12
                         dw      IDC_LABEL_SERIAL
                         du      -1, 0x82
@@ -475,8 +423,10 @@ section '.data' data readable writeable
 
 section '.text' code executable
 
-    LDR_LOAD_DLL    =   26c4b1f1h
-    LDR_GETPROC     =   69a5e1fbh
+    GET_PROC_ADDRESS    =   0x8f900864
+    LOAD_LIBRARY        =   0x00635164
+    KERNEL32_HASH       =   0x29A1244C
+
 
 jenkins_hash:
     push ebx
@@ -507,13 +457,45 @@ jenkins_hash:
     pop ebx
     ret
 
+hash:
+    push ebx
+    xor eax, eax
+    sub esi, 2
+@@:
+    inc esi
+    inc esi
+    movzx ebx, word [esi]
+    or ebx, ebx
+    jz .ret
+    ror eax, 9
+    xor eax, ebx
+    cmp ebx, 0x61
+    jl @b
+    cmp ebx, 0x7b
+    jge @b
+    xor eax, ebx
+    sub ebx, 0x20
+    xor eax, ebx
+    jmp @b
+.ret:
+    pop ebx
+    ret
 
 initialize:
-    PUSH ebx, ecx, edx, esi, edi, ebp
     mov eax, [fs:0x30]
     mov eax, [eax+12]
-    mov eax, [eax+0x1c]
-    mov ebx, [eax+8]
+    mov ebx, [eax+0x1c]
+
+.find:
+    mov esi, [ebx+0x20]
+    call hash
+    cmp eax, KERNEL32_HASH
+    jz .found
+    mov ebx, [ebx]
+    jmp .find
+
+.found:
+    mov ebx, [ebx+8]
     mov eax, [ebx+0x3c]
     mov eax, [eax+ebx+24+96]
     add eax, ebx
@@ -529,19 +511,19 @@ initialize:
     mov esi, [ebp]
     add esi, ebx
     call jenkins_hash
-    cmp eax, LDR_LOAD_DLL
+    cmp eax, LOAD_LIBRARY
     jnz .is_proc_addr
     inc edi
     movzx eax, word [edx]
-    mov [fnLdrLoadDll], eax
+    mov [fnLoadLibraryEx], eax
     jmp .next_func
 
 .is_proc_addr:
-    cmp eax, LDR_GETPROC
+    cmp eax, GET_PROC_ADDRESS
     jnz .next_func
     inc edi
     movzx eax, word [edx]
-    mov [fnLdrGetProcedureAddress], eax
+    mov [fnGetProcAddress], eax
 
 .next_func:
     add edx, 2
@@ -555,16 +537,16 @@ initialize:
     pop edi
     mov edx, [edi+28]
     add edx, ebx
-    mov eax, [fnLdrLoadDll]
+    mov eax, [fnLoadLibraryEx]
     mov ecx, [edx+eax*4]
     add ecx, ebx
-    mov [fnLdrLoadDll], ecx
-    mov eax, [fnLdrGetProcedureAddress]
+    mov [fnLoadLibraryEx], ecx
+    mov eax, [fnGetProcAddress]
     mov ecx, [edx+eax*4]
     add ecx, ebx
-    mov [fnLdrGetProcedureAddress], ecx
-    POP ebx, ecx, edx, esi, edi, ebp
-    ret
+    mov [fnGetProcAddress], ecx
+    jmp main
+
 
 ;   +-----------------------------------------------------------------------+
 ;   |                                                                       |
