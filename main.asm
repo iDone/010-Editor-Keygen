@@ -88,7 +88,7 @@
 
     format PE GUI 6.0
     entry initialize
-    include '\fasm\include\win32ax.inc'
+    include 'include\win32ax.inc'
 
 macro init_dll dll_id, dll_name, [func_name]
 {
