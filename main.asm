@@ -1191,7 +1191,18 @@ section '.res' data readable resource
     resdata m_info
         db "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>"
         db "<assembly xmlns='urn:schemas-microsoft-com:asm.v1' "
-        db "manifestVersion='1.0'>"
+        db "manifestVersion='1.0' "
+        db "xmlns:asmv3='urn:schemas-microsoft-com:asm.v3'>"
+        db "<asmv3:application>"
+        db "<asmv3:windowsSettings>"
+        db "<dpiAware "
+        db 'xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">'
+        db "true</dpiAware>"
+        db "<dpiAwareness "
+        db 'xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">'
+        db "PerMonitorV2</dpiAwareness>"
+        db "</asmv3:windowsSettings>"
+        db "</asmv3:application>"
         db '<trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">'
         db '<security><requestedPrivileges>'
         db "<requestedExecutionLevel "
